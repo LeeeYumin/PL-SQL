@@ -1,0 +1,46 @@
+/*
+1. 다음과 같이 출력되도록 하시오. (LOOP 써서 답안 3개. 담는 대상이 숫자가 아니라 문자.)
+*
+**
+***
+****
+*****
+*/
+
+--기본 LOOP
+DECLARE
+   v_num VARCHAR2(6 char) := ''; --각 줄에 출력할 *
+   v_sum NUMBER(2,0) := 1; --LOOP문 종료조건에 사용할 변수 : 1~5
+BEGIN
+    LOOP
+        v_num := v_num || '*';
+        DBMS_OUTPUT.PUT_LINE(v_num); 
+        v_sum := v_sum + 1;        
+        EXIT WHEN v_sum > 5; 
+    END LOOP;
+END;
+/
+
+--WHILE LOOP
+DECLARE
+   v_num VARCHAR2(6 char) := ''; --각 줄에 출력할 *
+   v_sum NUMBER(2,0) := 1; --LOOP문 종료조건에 사용할 변수 : 1~5
+BEGIN
+    WHILE v_sum < 6 LOOP
+        v_num := v_num || '*';
+        DBMS_OUTPUT.PUT_LINE(v_num); 
+        v_sum := v_sum + 1;         
+    END LOOP;
+END;
+/
+
+--FOR LOOP
+BEGIN 
+    FOR counter IN 1..5 LOOP --몇번째 줄
+        FOR i IN 1..counter LOOP -- * (결과적으로 정수값만 가지면 됨)
+            DBMS_OUTPUT.PUT('*'); --.PUT 사용하면 마지막엔 _LINE 써줘야됨. 아니면 출력 안됨.
+        END LOOP;
+        DBMS_OUTPUT.PUT_LINE('');
+    END LOOP;
+END;
+/

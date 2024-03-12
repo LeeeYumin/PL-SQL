@@ -1,0 +1,482 @@
+set serveroutput on
+
+DECLARE
+    v_deptno departments.department_id%TYPE; --테이블이 선언되고 나서 어떤 타입을 참조할지 알림
+    v_comm employees.commission_pct%TYPE := .1;
+BEGIN
+    SELECT department_id
+    INTO v_deptno
+    FROM employees
+    WHERE employee_id = &사원번호;
+    
+    INSERT INTO employees(employee_id, last_name, email, hire_date, job_id, department_id) 
+    VALUES (1000, 'Hong', 'hkd@google.com', sysdate, 'IT_PROG', v_deptno);
+    
+    UPDATE employees
+    SET salary = (NVL(salary, 0) + 10000) * v_comm
+    WHERE employee_id = 1000;
+END;
+/
+rollback; --밑에 SELECT 하고 롤백함
+
+--ORA-01403 : no data found 에러는 select 문에 없는 사람을 찾아서 뜨는거임. 모르겠으면 100으로 입력해넣자.
+--(100이상으로 입력하면 되는데 애매하면 100으로 입력하기.. 오타에러는 다르게 뜸!)
+
+SELECT *
+FROM employees
+WHERE employee_id = 1000;
+
+
+BEGIN
+    DELETE FROM employees
+    WHERE employee_id = 1000;
+    
+    --UPDATE employees
+    --SET salary = salary * 1.1
+    --WHERE employee_id = 0; -- employee_id 가 0인 사원은 없어서 UPDATE는 안됨.
+    IF SQL%ROWCOUNT = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('정상적으로 삭제되지 않았습니다'); --암시적커서에서 rowcount 는... 오류 안나면 1.    
+    END IF;
+END;
+/
+
+--헷갈린다.. 맨 처음에 insert update 했으면 데이터가 있는 상태임.
+--그 상태에서 delete(insert된거 대상) 하고 update...
+--암시적 커서는 DML에서 사용 가능하고 자기랑 연속적으로 실행되는.. 쿼리...에서만 응답?함.
+--모든 쿼리에 대해 확인하고 싶다면 rowcount 는 매번 해줄것
+
+
+/*문제 1 : 사원번호를 입력(치환변수사용&) 할 경우 사원번호, 사원이름, 부서이름을 출력하는 pl/sql 작성*/
+--SELECT 사원번호, 사원이름, 부서이름
+--FROM employees JOIN departments ON employees.department_id = departments.department_id
+--WHERE 사원번호 이렇게 나눠서 먼저 써보기
+
+--1) SQL문 작성먼저.
+SELECT employee_id, last_name, department_name
+FROM employees JOIN departments
+    ON employees.department_id = departments.department_id
+WHERE employee_id = 100;
+
+--2) PL/SQL 블록..
+DECLARE
+--DECLARE 는 안에 작성하고 마지막에. INTO 에 들어간거..
+    v_eid employees.employee_id%TYPE;
+    v_ename employees.last_name%TYPE;
+    v_deptname departments.department_name%TYPE;
+BEGIN
+    SELECT employee_id, last_name, department_name
+    INTO v_eid, v_ename, v_deptname 
+    FROM employees
+        JOIN departments
+        ON employees.department_id = departments.department_id
+    WHERE employee_id = &사원번호;
+    DBMS_OUTPUT.PUT_LINE('사원번호 : ' || v_eid);
+    DBMS_OUTPUT.PUT_LINE('사원이름 : ' || v_ename);
+    DBMS_OUTPUT.PUT_LINE('부서이름 : ' || v_deptname);
+    
+END;
+/
+
+--문제 1 : pl/sql 의 경우 가능한 select 문 2개로 나눠 쓰는 법도 있음
+DECLARE
+    v_eid employees.employee_id%TYPE;
+    v_ename employees.last_name%TYPE;
+    v_deptname departments.department_name%TYPE;
+BEGIN
+    SELECT employee_id, first_name, department_name
+    INTO v_eid, v_ename, v_deptname 
+    FROM employees
+    WHERE employee_id = &사원번호;
+    
+    SELECT 
+    INTO
+    FROM 
+    WHERE
+    
+END;
+/
+
+
+/*문제 2 : 사원번호를 입력(치환변수사용&) 할 경우
+사원이름, 급여, 연봉->(급여*12+(nvl(급여, 0)*nvl(커미션퍼센트,0)*12 출력하는 pl/sql 작성*/
+--SELECT 사원이름, 급여, (급여*12+(nvl(급여, 0)*nvl(커미션퍼센트,0)*12
+--FROM employees
+--WHERE 사원번호
+
+--1) SQL문 작성. 이거 작성 먼저 하고 확인해보자
+SELECT last_name, salary, (salary*12+(NVL(salary, 0)*NVL(commission_pct,0)*12)) as annual
+FROM employees
+WHERE employee_id = 100;
+
+select * from employees;
+
+--2) PL/SQL 블록
+DECLARE
+    v_ename employees.last_name%TYPE;
+    v_sal employees.salary%TYPE;
+    v_annual v_sal%TYPE;
+BEGIN
+    SELECT last_name, salary, (salary*12+(NVL(salary, 0)*NVL(commission_pct,0)*12)) as annual
+    INTO v_ename, v_sal, v_annual
+    FROM employees
+    WHERE employee_id = &사원번호;
+    
+    DBMS_OUTPUT.PUT_LINE('사원이름 : ' || v_ename);
+    DBMS_OUTPUT.PUT_LINE('급여 : ' || v_sal);
+    DBMS_OUTPUT.PUT_LINE('연봉 : ' || v_annual);
+END;
+/
+
+--pl/sql 경우 사용 가능한 방법. (함수를 별도로)
+DECLARE
+    v_ename employees.last_name%TYPE;
+    v_sal employees.salary%TYPE;
+    v_comm employees.commission_pct%TYPE;
+    v_annual v_sal%TYPE;
+BEGIN
+    SELECT last_name, salary, commission_pct
+    INTO v_ename, v_sal, v_comm
+    FROM employees
+    WHERE employee_id = &사원번호;
+    
+    v_annual := (v_sal*12+(NVL(v_sal, 0)*NVL(v_comm,0)*12)); --이렇게 따로 떼주고 DECLARE에 선언추가.
+    
+    DBMS_OUTPUT.PUT_LINE('사원이름 : ' || v_ename);
+    DBMS_OUTPUT.PUT_LINE('급여 : ' || v_sal);
+    DBMS_OUTPUT.PUT_LINE('연봉 : ' || v_annual);
+END;
+/
+
+CREATE TABLE test_employees
+AS
+    SELECT *
+    FROM employees; --IF문 들어가기 전 테이블 생성먼저 함.
+    
+SELECT *
+FROM test_employees;
+
+ROLLBACK;
+
+--기본 IF 문 (false 가 없는 경우)
+BEGIN
+    DELETE FROM test_employees
+    WHERE employee_id = &사원번호;
+    
+    IF SQL%ROWCOUNT = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('정상적으로 삭제되지 않았습니다');
+        DBMS_OUTPUT.PUT_LINE('사원번호를 확인해주세요');
+    
+    END IF;
+END;
+/
+
+--IF ~ ELSE 문 : 하나의 조건식, 결과는 참과 거짓 각각
+DECLARE --변수 선언!
+    v_result NUMBER(4,0);
+BEGIN
+    SELECT COUNT (employee_id)
+    INTO v_result
+    FROM employees
+    WHERE manager_id = &사원번호; --그 사원이 팀장인지 아닌지 판별
+    
+    IF v_result = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('일반사원입니다');
+    
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('팀장입니다');
+    END IF;
+    
+END;
+/
+
+SELECT employee_id
+FROM employees
+WHERE manager_id = 100; --난 왜 15건이나 나오지....
+
+--IF ~ ELSIF ~ ELSE 문 : 다중 조건식이 필요, 각각 결과처리
+--연차 구하는 공식
+SELECT employee_id, TRUNC(MONTHS_BETWEEN(sysdate, hire_date)/12)
+FROM employees;
+
+--5년 / 10년 / 15년... 미만으로 구분해보기
+DECLARE
+     v_hyear NUMBER(2,0);
+BEGIN
+    SELECT TRUNC(MONTHS_BETWEEN(sysdate, hire_date)/12)
+    INTO v_hyear
+    FROM employees
+    WHERE employee_id = &사원번호;
+    
+    IF v_hyear < 5 THEN
+        DBMS_OUTPUT.PUT_LINE('입사한 지 5년 미만입니다');
+    ELSIF v_hyear < 10 THEN
+        DBMS_OUTPUT.PUT_LINE('입사한 지 5년 이상 10년 미만입니다');
+    ELSIF v_hyear < 15 THEN
+        DBMS_OUTPUT.PUT_LINE('입사한 지 10년 이상 15년 미만입니다');
+    ELSIF v_hyear < 20 THEN
+        DBMS_OUTPUT.PUT_LINE('입사한 지 15년 이상 20년 미만입니다');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('입사한 지 20년 이상입니다'); --조건문에 v_hyear 사용하는 거 아니었음..
+    END IF;
+END;
+/
+
+/*문제 3-1 : 사원번호를 입력(치환변수사용&) 할 경우
+입사일이 2015년 이후(2015년 포함)이면 'New employee' 출력하고
+        2015년 이전이면 'Career employee' 출력*/
+--SQL : SELECT문. 입력 받는 값은 사원번호. 결과는 입사일.
+--SELECT 입사일
+--FROM employees
+--WHERE 사원번호
+
+--IF문, 입사일 >= 2015-01-01, New employee
+--      아닐경우 Career employee
+
+--1) SQL문
+--SELECT TO_CHAR(hire_date,'yyyy') --내가 갖고있는 걸 어떻게 출력할지. 문자열로 돌려줌.
+SELECT hire_date
+FROM employees
+WHERE employee_id = &사원번호;
+
+--2) PL/SQL 블록
+
+DECLARE
+    v_hdate employees.hire_date%TYPE;
+BEGIN
+    SELECT hire_date
+    INTO v_hdate
+    FROM employees
+    WHERE employee_id = &사원번호;
+    
+    IF v_hdate >= TO_DATE('2015-01-01','yyyy-MM-dd') THEN
+    --IF TO_CHAR(v_hdate, 'yyyy')>='2015' THEN 도 가능.. 년도만 잘라냄.
+        DBMS_OUTPUT.PUT_LINE('New employee');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('Career employee');
+    END IF;
+END;
+/
+
+--RR YY 비교 (YY가 만능은 아님...)
+SELECT TO_CHAR(TO_DATE('99/01/01', 'rr/MM/dd'), 'yyyy-MM-dd'),
+        TO_CHAR(TO_DATE('99/01/01', 'yy/MM/dd'), 'yyyy-MM-dd')
+FROM dual;
+
+
+/*문제 3-2 : 사원번호를 입력(치환변수사용&) 할 경우
+입사일이 2015년 이후(2015년 포함)이면 'New employee' 출력하고
+        2015년 이전이면 'Career employee' 출력
+단, DBMS_OUTPUT,PUT_LINE ~ 은 한 번만 사용할 것*/
+--변수 만들어서 쓰면 됨.. 이렇게도 쓸 수 있다~~~
+
+DECLARE
+    v_hdate employees.hire_date%TYPE;
+    v_msg VARCHAR2(1000) := 'Career employee';
+BEGIN
+    SELECT hire_date
+    INTO v_hdate
+    FROM employees
+    WHERE employee_id = &사원번호;
+    
+    IF v_hdate >= TO_DATE('2015-01-01','yyyy-MM-dd') THEN
+    --IF TO_CHAR(v_hdate, 'yyyy')>='2015' THEN 도 가능.. 년도만 잘라냄.
+        v_msg := 'New employee';
+    ELSE
+        v_msg := 'Career employee';
+    END IF;
+    
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+       
+END;
+/
+
+
+/*문제 4? 5? : 
+급여가 5000 이하이면 20% 인상된 급여
+급여가 10000 이하이면 15% 인상된 급여
+급여가 15000 이하이면 10% 인상된 급여
+급여가 15001 이상이면 급여 인상 없음
+사원번호를 입력(치환변수) 하면 사원이름, 급여, 인상된 급여가 출력되도록 pl/sql 블록 생성*/
+--입력 : 사원번호
+--연산 : 1) SELECT문 employees => 사원이름, 급여
+--       2) IF문 이용해서 비율 결정 -> 조건식 : 기준, 급여 => 인상된 급여
+--출력(결과) : 사원이름, 급여, 인상된 급여
+
+--1) SQL문
+SELECT last_name, salary
+FROM employees
+WHERE employee_id = &사원번호;
+    
+--2) PL/SQL 블록
+DECLARE
+    v_ename employees.last_name%TYPE;
+    v_sal employees.salary%TYPE;
+    v_raise NUMBER(5,1); -- NUMBER은 38자리까지.
+    v_result v_sal%TYPE;
+BEGIN
+    SELECT last_name, salary
+    INTO v_ename, v_sal
+    FROM employees
+    WHERE employee_id = &사원번호;
+
+    IF v_sal <= 5000 THEN
+        v_raise := 20;
+    ELSIF v_sal <= 10000 THEN
+        v_raise := 15;
+    ELSIF v_sal <= 15000 THEN
+        v_raise := 10; --rise := salary * 1.1 이렇게 생각함..
+    ELSE
+        v_raise := 0;
+    END IF;
+    
+    v_result := v_sal + (v_sal * v_raise/100);
+    DBMS_OUTPUT.PUT_LINE('사원이름   :' || v_ename);
+    DBMS_OUTPUT.PUT_LINE('급여       :' || v_sal);
+    DBMS_OUTPUT.PUT_LINE('인상된 급여 :' || v_result);
+    
+END;
+/
+
+--기본 LOOP문
+DECLARE
+    v_num NUMBER(38) := 0;
+BEGIN
+    LOOP
+        v_num := v_num + 1;
+        DBMS_OUTPUT.PUT_LINE(v_num);
+        EXIT WHEN v_num > 10; --종료조건.
+    END LOOP;
+END;
+/
+--에러는 안나는데 계속 돈다..
+
+--WHILE LOOP문
+DECLARE
+    v_num NUMBER(38,0) := 1; --초기값을 주는게 편하다
+BEGIN
+    WHILE v_num < 5 LOOP --반복조건
+        DBMS_OUTPUT.PUT_LINE(v_num);
+        v_num := v_num + 1;
+    END LOOP;
+
+END;
+/
+--에러뜸. while 문 찾아갔을 때 1인데 5보다 작음. 그래서 false가 될 일은 없음.
+--조건이 만족되는 동안 수행. v_num := v_num + 1; 넣어주면 돌아가고 종료된다.
+--DECLARE 에서 :=1 이 아닌 10으로 주면 아예 실행 안됨..
+
+--예제 : 1에서 10가지 정수값의 합
+--1) 기본 LOOP
+DECLARE
+    v_sum NUMBER(2,0) := 0; --누적시켜야 하니까 초기값 0
+    v_num NUMBER(2,0) := 1; --특정 범위의 값.. 이 값부터 더하기 시작?
+BEGIN
+    LOOP
+        v_sum := v_sum + v_num;
+        v_num := v_num + 1;
+        EXIT WHEN v_num > 10;
+    END LOOP;
+    DBMS_OUTPUT.PUT_LINE(v_sum);
+END;
+/
+
+--2) WHILE LOOP
+DECLARE
+    v_sum NUMBER(2,0) := 0; 
+    v_num NUMBER(2,0) := 1; 
+BEGIN
+     WHILE v_num <= 10 LOOP -- 1)과 비교하는 값은 같은데 연산자는 반대로. 내부 프로세스는 같다.
+        v_sum := v_sum + v_num;
+        v_num := v_num + 1;      
+    END LOOP;
+    DBMS_OUTPUT.PUT_LINE(v_sum);
+END;
+/
+--순서가 바뀌는 건 상관없는데 그런 경우 범위나 초기값은 맞게 수정되어야 함
+
+--FOR LOOP
+--DECLARE 없어도 변수 쓰임. 할당연산자나 default 가 없어도 출력됨.
+BEGIN
+    FOR idx IN -10 .. 5 LOOP --이름은 뭐든 상관X. 타입은 정수. .는 2개 들어감(..)
+        IF MOD(idx, 2) <> 0 THEN -- MOD  : 나머지 구하는 함수. <>는 !=를 의미. 
+        --현재 값을 2로 나눴을 때의 나머지가 0이 아닌거 (즉 홀수) 를 구하고 싶을때는 이렇게.
+            DBMS_OUTPUT.PUT_LINE(idx);   
+        END IF;
+    END LOOP;
+END;
+/
+
+--주의사항 1) 범위 지정
+BEGIN
+    FOR idx IN REVERSE -10 .. 5 LOOP --(-10/5) .. (4/2) 같은 표현식도 가능.
+        IF MOD(idx, 2) <> 0 THEN
+            DBMS_OUTPUT.PUT_LINE(idx);   
+        END IF;
+    END LOOP;
+END;
+/
+
+--주의사항 2) 카운터 counter
+DECLARE
+    v_num NUMBER(2,0) := 0;
+BEGIN
+    DBMS_OUTPUT.PUT_LINE(v_num);
+    v_num := v_num * 2;
+    DBMS_OUTPUT.PUT_LINE(v_num);
+    DBMS_OUTPUT.PUT_LINE('=============');
+    FOR v_num In 1 .. 10 LOOP
+    -- v_num := v_num * 2;
+    v_num := 0;
+        DBMS_OUTPUT.PUT_LINE(v_num);
+    END LOOP;
+    DBMS_OUTPUT.PUT_LINE(v_num);    
+END;
+/
+--처음 작성한 거 기준으로 0부터 10까지 나오고 0이 찍힌다..
+--할당연산자를 기준으로 왼쪽에는 존재할 수 없으니 for loop 안에서는 값 변경 시도 하지 말것. 제어할 수 있는 대상 아님.
+--밖에서 선언하는 것과 혼동할 수 있으니 주의..?
+
+
+--예제 : 1에서 10가지 정수값의 합
+--3) FOR LOOP
+DECLARE
+    -- 정수값 필요 : 1~10. => FOR LOOP 의 카운터로 처리
+    -- 합계
+    v_total NUMBER(2,0) := 0; --가능하다면 초기값은 주고 시작하자.
+BEGIN    
+    FOR num IN 1 .. 10 LOOP
+        v_total := v_total + num; --total은 초기값 없으면 NULL임.
+    END LOOP;
+    
+    DBMS_OUTPUT.PUT_LINE(v_total); 
+END;
+/
+
+
+/*
+1. 다음과 같이 출력되도록 하시오. (LOOP 써서 답안 3개. 담는 대상이 숫자가 아니라 문자.)
+*
+**
+***
+****
+*****
+*/
+
+--기본 LOOP
+DECLARE
+   v_num := VARCHAR2(30);
+   v_sum := NUMBER(2,0);
+BEGIN
+    LOOP
+        v_sum := v_num + 1;
+        EXIT WHEN v_num > 6; 
+    END LOOP;
+END;
+/
+
+--WHILE LOOP
+
+
+
+--FOR LOOP
+

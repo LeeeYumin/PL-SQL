@@ -1,0 +1,54 @@
+/*
+4. 구구단 1~9단까지 출력되도록 하시오.
+   (단, 홀수단 출력)
+*/
+
+-- FOR LOOP + IF문
+BEGIN
+    FOR v_dan IN 1..9 LOOP -- 특정 단을 1~9까지 반복하는 LOOP문
+        IF MOD(v_dan, 2) <> 0 THEN
+            FOR v_num IN 1..9 LOOP -- 특정 단의 1~9까지 곱하는 LOOP문
+                DBMS_OUTPUT.PUT_LINE(v_dan || ' X ' || v_num || ' = ' || ( v_dan * v_num ));  
+            END LOOP;
+            DBMS_OUTPUT.PUT_LINE('');
+        END IF;
+    END LOOP;
+END;
+/
+
+-- FOR LOOP + IF문
+BEGIN
+    FOR v_dan IN 1..9 LOOP -- 특정 단을 1~9까지 반복하는 LOOP문
+        IF MOD(v_dan, 2) = 0 THEN 
+            CONTINUE;
+        END IF;
+        
+        FOR v_num IN 1..9 LOOP -- 특정 단의 1~9까지 곱하는 LOOP문
+            DBMS_OUTPUT.PUT_LINE(v_dan || ' X ' || v_num || ' = ' || ( v_dan * v_num ));  
+        END LOOP;
+        DBMS_OUTPUT.PUT_LINE('');
+    END LOOP;
+END;
+/
+
+-- 기본 LOOP
+DECLARE
+    v_dan NUMBER(2,0) := 1;
+    v_num NUMBER(2,0) := 1;
+BEGIN
+    LOOP -- 단
+        IF MOD(v_dan, 2) <> 0 THEN
+            v_num := 1;
+            LOOP -- 곱하는 수
+                DBMS_OUTPUT.PUT_LINE(v_dan || ' X ' || v_num || ' = ' || ( v_dan * v_num ));
+                v_num := v_num + 1;
+                EXIT WHEN v_num > 9;
+            END LOOP;
+            DBMS_OUTPUT.PUT_LINE('');
+        END IF;
+        
+        v_dan := v_dan + 1;
+        EXIT WHEN v_dan > 9;
+    END LOOP;    
+END;
+/
